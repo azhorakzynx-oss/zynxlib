@@ -3,7 +3,7 @@
 .dP"Y8 Yb  dP 8888b.  888888 
 `Ybo."  YbdP   8I  Yb 88__   
 o.`Y8b   8P    8I  dY 88""   
-8bodP'  dP    8888Y"  888888  v23
+8bodP'  dP    8888Y"  888888  v23.06.14
 
 ]]
 
@@ -5228,32 +5228,95 @@ function syde:Init(library)
 
 function telement:PlayerDropdown(config)
     local Players = game:GetService("Players")
+    local LP = Players.LocalPlayer
 
-    local function getPlayers()
-        local t = {}
-        for _,p in ipairs(Players:GetPlayers()) do
-            table.insert(t, p.Name)
+    local selected = {}
+    local offline = {}
+    local max = config.Max or math.huge
+
+    local function countSelected()
+        local c = 0
+        for _ in pairs(selected) do
+            c += 1
         end
-        return t
+        return c
+    end
+
+    local function buildList()
+        local list = {}
+
+        for _,p in ipairs(Players:GetPlayers()) do
+            if p ~= LP then
+                local name = p.Name
+                local display = p.DisplayName or name
+
+                if selected[name] then
+                    table.insert(list, "🟢 "..display.." (@"..name..")")
+                else
+                    table.insert(list, display.." (@"..name..")")
+                end
+            end
+        end
+
+        for name,_ in pairs(offline) do
+            if selected[name] then
+                table.insert(list, "🔴 "..name.." (@offline)")
+            end
+        end
+
+        return list
     end
 
     local dropdown = self:Dropdown({
         Title = config.Title or "Players",
-        Options = getPlayers(),
-        PlaceHolder = config.PlaceHolder or "Select player",
-        CallBack = config.CallBack
+        Options = buildList(),
+        Multi = true,
+        PlaceHolder = config.PlaceHolder or "Select players",
+        CallBack = function(values)
+            local newSelected = {}
+
+            for _,v in ipairs(values) do
+                local username = v:match("@(.+)")
+                if username then
+                    if not selected[username] and countSelected() >= max then
+                        if config.Notify then
+                            config.Notify("só pode selecionar "..max.." jogadores")
+                        end
+                    else
+                        newSelected[username] = true
+                        offline[username] = nil
+                    end
+                end
+            end
+
+            selected = newSelected
+
+            if config.CallBack then
+                config.CallBack(selected)
+            end
+        end
     })
 
-    task.spawn(function()
+    local function refresh()
         if dropdown and dropdown.Refresh then
-            Players.PlayerAdded:Connect(function()
-                dropdown:Refresh(getPlayers())
-            end)
-
-            Players.PlayerRemoving:Connect(function()
-                dropdown:Refresh(getPlayers())
-            end)
+            dropdown:Refresh(buildList())
         end
+    end
+
+    Players.PlayerRemoving:Connect(function(p)
+        if selected[p.Name] then
+            offline[p.Name] = true
+        end
+        task.wait()
+        refresh()
+    end)
+
+    Players.PlayerAdded:Connect(function(p)
+        if offline[p.Name] then
+            offline[p.Name] = nil
+        end
+        task.wait()
+        refresh()
     end)
 
     return dropdown
