@@ -4911,6 +4911,9 @@ function syde:Init(library)
 					PlaceHolder = Dropdown.PlaceHolder or "Select Option...";
 					Multi = Dropdown.Multi or false;
 					CallBack = Dropdown.CallBack;
+					Flag = Dropdown.Flag;
+					SFlag = Dropdown.SFlag;
+					Type = "Dropdown";
 				}
 
 				local dropdown = window.settings.pages.page.Dropdown:Clone()
@@ -5224,6 +5227,28 @@ function syde:Init(library)
 				end
 
 				SetDropdownOptions()
+
+				-- Registrar no sistema de flags para salvar
+				if data.SFlag then
+					syde.SettingsFlags[data.SFlag] = data
+				end
+
+				-- Carregar valores salvos da configuração
+				if syde.ConfigEnabled and data.Flag and syde.Flags[data.Flag] then
+					local existing = syde.Flags[data.Flag]
+					if data.Multi and type(existing.V) == "table" then
+						for _, value in ipairs(existing.V) do
+							AddToSelected(value)
+						end
+						UpdateSelectedText()
+					elseif not data.Multi and existing.V then
+						SelectedOptions = {[existing.V] = true}
+						SelectedOrder = {existing.V}
+						dropdown.dropholder.drop.selected.Text = existing.V
+					end
+				end
+
+				return data
 			end
 
 			function telement:PlayerDropdown(PlayerDropdown)
@@ -5231,6 +5256,10 @@ function syde:Init(library)
 					Title = PlayerDropdown.Title or "Select Players";
 					PlaceHolder = PlayerDropdown.PlaceHolder or "Select players...";
 					CallBack = PlayerDropdown.CallBack;
+					Flag = PlayerDropdown.Flag;
+					SFlag = PlayerDropdown.SFlag;
+					V = PlayerDropdown.StarterValue or {};
+					Type = "PlayerDropdown";
 				}
 
 				local dropdown = window.settings.pages.page.Dropdown:Clone()
@@ -5555,6 +5584,49 @@ function syde:Init(library)
 						UpdatePlayerColor(playerName, true)
 					end
 				end)
+
+				-- Função Set para restaurar valores (integração com sistema de config)
+				function data:Set(selectedPlayers)
+					if type(selectedPlayers) ~= "table" then
+						return
+					end
+
+					-- Limpar seleção anterior
+					SelectedOptions = {}
+					SelectedOrder = {}
+
+					-- Restaurar valores
+					for _, playerName in ipairs(selectedPlayers) do
+						if not SelectedOptions[playerName] then
+							SelectedOptions[playerName] = true
+							table.insert(SelectedOrder, playerName)
+						end
+					end
+
+					UpdateSelectedText()
+
+					-- Trigger callback
+					if self.CallBack then
+						self.CallBack(SelectedOrder)
+					end
+				end
+
+				-- Registrar no sistema de flags para salvar
+				if data.SFlag then
+					syde.SettingsFlags[data.SFlag] = data
+				end
+
+				-- Carregar valores salvos da configuração
+				if syde.ConfigEnabled and data.Flag and syde.Flags[data.Flag] then
+					local existing = syde.Flags[data.Flag]
+					if type(existing.V) == "table" then
+						data:Set(existing.V)
+					end
+				elseif type(data.V) == "table" and #data.V > 0 then
+					data:Set(data.V)
+				end
+
+				return data
 			end
 
 			function telement:Slider(Slider)
