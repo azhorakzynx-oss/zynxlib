@@ -3,7 +3,7 @@
 .dP"Y8 Yb  dP 8888b.  888888 
 `Ybo."  YbdP   8I  Yb 88__   
 o.`Y8b   8P    8I  dY 88""   
-8bodP'  dP    8888Y"  888888  v0
+8bodP'  dP    8888Y"  888888  v23
 
 ]]
 
@@ -5225,6 +5225,39 @@ function syde:Init(library)
 
 				SetDropdownOptions()
 			end
+
+function telement:PlayerDropdown(config)
+    local Players = game:GetService("Players")
+
+    local function getPlayers()
+        local t = {}
+        for _,p in ipairs(Players:GetPlayers()) do
+            table.insert(t, p.Name)
+        end
+        return t
+    end
+
+    local dropdown = self:Dropdown({
+        Title = config.Title or "Players",
+        Options = getPlayers(),
+        PlaceHolder = config.PlaceHolder or "Select player",
+        CallBack = config.CallBack
+    })
+
+    task.spawn(function()
+        if dropdown and dropdown.Refresh then
+            Players.PlayerAdded:Connect(function()
+                dropdown:Refresh(getPlayers())
+            end)
+
+            Players.PlayerRemoving:Connect(function()
+                dropdown:Refresh(getPlayers())
+            end)
+        end
+    end)
+
+    return dropdown
+end
 
 			function telement:Slider(Slider)
 				local data = {
