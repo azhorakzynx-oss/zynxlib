@@ -1,10 +1,10 @@
 --[[
 
-.dP"Y8 Yb  dP 8888b.  888888 
-`Ybo."  YbdP   8I  Yb 88__   
-o.`Y8b   8P    8I  dY 88""   
-8bodP'  dP    8888Y"  888888  v0.0.1
-
+888888  .dP"Y8 88     88 8888b.  .dP"Y8 888888 ZZZZZZ
+88__    `Ybo." 88     88  8I  Yb `Ybo." 88__     ZZ  
+88""    o.`Y8b 88  .o 88  8I  dY o.`Y8b 88""    ZZ   
+888888  8bodP' 88ood8 88 8888Y"  8bodP' 888888 ZZZZZZ
+v1.0
 ]]
 
 local inputservice =	game:GetService("InsertService")
