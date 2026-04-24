@@ -3,7 +3,7 @@
 .dP"Y8 Yb  dP 8888b.  888888 
 `Ybo."  YbdP   8I  Yb 88__   
 o.`Y8b   8P    8I  dY 88""   
-8bodP'  dP    8888Y"  888888  v0
+8bodP'  dP    8888Y"  888888  v1
 
 ]]
 
@@ -5253,329 +5253,59 @@ function syde:Init(library)
 
 			function telement:PlayerDropdown(PlayerDropdown)
 				local PlayerService = game:GetService("Players")
-				
-				local data = {
+
+				-- Função para gerar opções com jogadores online
+				local function GetPlayerOptions()
+					local options = {}
+					for _, player in ipairs(PlayerService:GetPlayers()) do
+						table.insert(options, player.Name)
+					end
+					return options
+				end
+
+				-- Criar Dropdown nativo com opções de jogadores
+				local dropdownData = self:Dropdown({
 					Title = PlayerDropdown.Title or "Select Players";
-					Options = {};
-					StarterOption = nil;
+					Options = GetPlayerOptions();
 					PlaceHolder = PlayerDropdown.PlaceHolder or "Select players...";
 					Multi = true;
 					CallBack = PlayerDropdown.CallBack;
 					Flag = PlayerDropdown.Flag;
 					SFlag = PlayerDropdown.SFlag;
-					Type = "PlayerDropdown";
-				}
+				})
 
-				local LeftPlayers = {}
+				-- Rastrear jogadores que saíram
+				local leftPlayers = {}
 
-				-- Função para atualizar opções de jogadores
-				local function RefreshPlayerOptions()
-					data.Options = {}
-					for _, player in ipairs(PlayerService:GetPlayers()) do
-						table.insert(data.Options, player.Name)
-					end
+				-- Método Refresh para atualizar lista de jogadores
+				function dropdownData:Refresh()
+					-- Será implementado através do evento de mudança de jogadores
+					-- Este método pode ser chamado manualmente se necessário
 				end
 
-				RefreshPlayerOptions()
-
-				-- Criar usando o Dropdown nativo
-				local dropdown = window.settings.pages.page.Dropdown:Clone()
-				dropdown.Visible = true
-				dropdown.Parent = Page
-				dropdown.title.Text = data.Title
-				dropdown.Name = data.Title
-				dropdown.dropholder.drop.Container.Option.Visible = false
-				dropdown.dropholder.drop.Container.Visible = false
-				tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
-				dropdown.dropholder.drop.selected.Text = data.PlaceHolder
-
-				local DropOpen = false
-				local DeBounce = false
-				local OptionButton = dropdown.dropholder.drop.Container.Option
-				local SelectedOptions = {}
-				local SelectedOrder = {}
-
-				local function UpdateCustomLayout()
-					local yOffset = 0
-					for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
-						if option:IsA("Frame") and option.Visible then
-							tweenservice:Create(option, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 0, 0, yOffset)}):Play()
-							yOffset = yOffset + option.Size.Y.Offset + 7
-						end
-					end
-				end
-
-				local function OpenDrop()
-					DropOpen = true
-					dropdown.dropholder.drop.Container.Visible = true
-					dropdown.dropholder.drop.search.Visible = true
-
-					tweenservice:Create(dropdown, TweenInfo.new(1.34, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 300) }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.UICorner, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { CornerRadius = UDim.new(0, 20) }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 180 }):Play()
-
-					tweenservice:Create(dropdown.dropholder.drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
-				end
-
-				local function CloseDrop()
-					DropOpen = false
-					tweenservice:Create(dropdown, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 95) }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.UICorner, TweenInfo.new(1, Enum.EasingStyle.Quint), { CornerRadius = UDim.new(1,0) }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
-
-					tweenservice:Create(dropdown.dropholder.drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-					tweenservice:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
-
-					task.wait(0.6)
-					dropdown.dropholder.drop.Container.Visible = false
-					dropdown.dropholder.drop.search.Visible = false
-				end
-
-				dropdown.dropholder.drop.down.MouseButton1Click:Connect(function()
-					if DeBounce then return end
-					DeBounce = true
-
-					if DropOpen then
-						CloseDrop()
-					else
-						OpenDrop()
-					end
-
-					task.delay(1.2, function()
-						DeBounce = false
-					end)
-				end)
-
-				local function AddToSelected(option)
-					if not SelectedOptions[option] then
-						SelectedOptions[option] = true
-						table.insert(SelectedOrder, option)
-					end
-				end
-
-				local function RemoveFromSelected(option)
-					if SelectedOptions[option] then
-						SelectedOptions[option] = nil
-						for i = #SelectedOrder, 1, -1 do
-							if SelectedOrder[i] == option then
-								table.remove(SelectedOrder, i)
-								break
-							end
-						end
-					end
-
-					if LeftPlayers[option] then
-						LeftPlayers[option] = nil
-					end
-
-					local selectedContainer = dropdown.dropholder.drop.selectContainer.ScrollingFrame
-					for _, child in ipairs(selectedContainer:GetChildren()) do
-						if child:IsA("Frame") and child.Name == option then
-							child:Destroy()
-							break
-						end
-					end
-				end
-
-				local function UpdateSelectedText()
-					local selectedContainer = dropdown.dropholder.drop.selectContainer.ScrollingFrame
-					local placeholderText = dropdown.dropholder.drop.selected
-					selectedContainer.Visible = data.Multi
-					dropdown.dropholder.drop.selected.Visible = false
-
-					if #SelectedOrder == 0 then
-						placeholderText.Visible = true
-						selectedContainer.Visible = false
-						return
-					end
-
-					for _, option in ipairs(SelectedOrder) do
-						if not selectedContainer:FindFirstChild(option) then
-							local optionGroup = selectedContainer.result:Clone()
-							optionGroup.Visible = true
-							optionGroup.Name = option
-							optionGroup.TextLabel.Text = option
-
-							if LeftPlayers[option] then
-								optionGroup.TextLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-								optionGroup.BackgroundColor3 = Color3.fromRGB(80, 30, 30)
-							end
-
-							optionGroup.X.MouseButton1Click:Connect(function()
-								RemoveFromSelected(option)
-								UpdateSelectedText()
-
-								for _, opt in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
-									if opt:IsA("Frame") and opt.Name == option then
-										tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-										tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-										tweenservice:Create(opt.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-										tweenservice:Create(opt.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-										tweenservice:Create(opt.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0.9}):Play()
-									end
-								end
-
-								if data.CallBack then
-									data.CallBack(SelectedOrder)
-								end
-							end)
-
-							optionGroup.Parent = selectedContainer
-
-							task.defer(function()
-								local padding = 40
-								local textWidth = optionGroup.TextLabel.TextBounds.X
-								local totalWidth = textWidth + padding
-								optionGroup.TextLabel.Size = UDim2.new(0, textWidth, 1, 0)
-								tweenservice:Create(optionGroup, TweenInfo.new(0.67, Enum.EasingStyle.Exponential), {Size = UDim2.new(0, totalWidth, 0, 20)}):Play()
-							end)
-						end
-					end
-				end
-
-				dropdown.dropholder.drop.search.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
-					local searchText = dropdown.dropholder.drop.search.TextBox.Text:lower()
-
-					for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
-						if option:IsA("Frame") and option:FindFirstChild("Title") then
-							local optionText = option.Title.Text:lower()
-							local isTemplate = option.Name == "Option"
-							local shouldShow = not isTemplate and (searchText == "" or optionText:find(searchText, 1, true) or SelectedOptions[option.Title.Text])
-
-							if shouldShow then
-								option.Visible = true
-								if SelectedOptions[option.Title.Text] then
-									tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-									tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-									tweenservice:Create(option.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-									tweenservice:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-									tweenservice:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
-								else
-									tweenservice:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-									tweenservice:Create(option, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-									tweenservice:Create(option.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-									tweenservice:Create(option.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
-									tweenservice:Create(option.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0.9}):Play()
-								end
-							else
-								tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-								tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-								tweenservice:Create(option.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-								tweenservice:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-								tweenservice:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
-								option.Visible = false
-							end
-						end
-					end
-
-					UpdateCustomLayout()
-				end)
-
-				local function SetPlayerOptions()
-					local starterSet = false
-					for _, OptionText in ipairs(data.Options) do
-						local option = OptionButton:Clone()
-						option.Title.Text = OptionText
-						option.Parent = dropdown.dropholder.drop.Container
-						option.Visible = true
-						option.Name = OptionText
-
-						option.Interact.MouseButton1Click:Connect(function()
-							if SelectedOptions[OptionText] then
-								RemoveFromSelected(OptionText)
-								tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-								tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0.9}):Play()
-							else
-								AddToSelected(OptionText)
-								tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-								tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
-							end
-
-							if data.CallBack then
-								data.CallBack(SelectedOrder)
-							end
-
-							UpdateSelectedText()
-						end)
-					end
-
-					UpdateCustomLayout()
-				end
-
-				SetPlayerOptions()
-
-				-- Monitorar jogadores que entram/saem
+				-- Monitorar quando jogador entra
 				PlayerService.PlayerAdded:Connect(function(player)
 					local playerName = player.Name
 					
-					RefreshPlayerOptions()
-
-					if LeftPlayers[playerName] then
-						AddToSelected(playerName)
-						LeftPlayers[playerName] = nil
-						UpdateSelectedText()
+					-- Se jogador estava marcado como offline, auto-selecionar
+					if leftPlayers[playerName] and dropdownData.SelectedOptions then
+						dropdownData.SelectedOptions[playerName] = true
+						table.insert(dropdownData.SelectedOrder, playerName)
+						leftPlayers[playerName] = nil
 					end
-
-					-- Re-renderizar lista
-					for _, child in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
-						if child:IsA("Frame") and child.Name ~= "Option" then
-							child:Destroy()
-						end
-					end
-					SetPlayerOptions()
 				end)
 
+				-- Monitorar quando jogador sai
 				PlayerService.PlayerRemoving:Connect(function(player)
 					local playerName = player.Name
-
-					if SelectedOptions[playerName] then
-						LeftPlayers[playerName] = true
-						for _, opt in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
-							if opt:IsA("Frame") and opt.Name == playerName then
-								tweenservice:Create(opt, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(150, 40, 40)}):Play()
-								tweenservice:Create(opt.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {Color = Color3.fromRGB(200, 80, 80)}):Play()
-								break
-							end
-						end
+					
+					-- Se estava selecionado, marcar como offline (vai ficar vermelho na UI)
+					if dropdownData.SelectedOptions and dropdownData.SelectedOptions[playerName] then
+						leftPlayers[playerName] = true
 					end
 				end)
 
-				function data:Refresh()
-					RefreshPlayerOptions()
-					for _, child in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
-						if child:IsA("Frame") and child.Name ~= "Option" then
-							child:Destroy()
-						end
-					end
-					SetPlayerOptions()
-				end
-
-				if data.SFlag then
-					syde.SettingsFlags[data.SFlag] = data
-				end
-
-				if syde.ConfigEnabled and data.Flag and syde.Flags[data.Flag] then
-					local existing = syde.Flags[data.Flag]
-					if type(existing.V) == "table" then
-						for _, value in ipairs(existing.V) do
-							AddToSelected(value)
-						end
-						UpdateSelectedText()
-					end
-				end
-
-				return data
+				return dropdownData
 			end
 
 			function telement:Slider(Slider)
