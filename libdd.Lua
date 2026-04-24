@@ -5235,604 +5235,472 @@ function syde:Init(library)
 
 				SetDropdownOptions()
 			end
---@PlayerDropdown
-function initelement:PlayerDropdown(PlayerDropdown)
-	local data = {
-		Title = PlayerDropdown.Title or "Select Players";
-		MaxSelect = PlayerDropdown.MaxSelect or 1; -- Quantos jogadores podem ser selecionados (use 0 para sem limite)
-		PlaceHolder = PlayerDropdown.PlaceHolder or "Select Players...";
-		Multi = true; -- Sempre true para selecionar múltiplos
-		CallBack = PlayerDropdown.CallBack;
-		Flag = PlayerDropdown.Flag;
-	}
 
-	local dropdown = pages.page.Dropdown:Clone()
-	dropdown.Visible = true
-	dropdown.Parent = Page
-	dropdown.title.Text = data.Title
-	dropdown.Name = data.Title
-	dropdown.dropholder.drop.Container.Option.Visible = false
-	dropdown.dropholder.drop.Container.Visible = false
-	tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
-	dropdown.dropholder.drop.selected.Text = data.PlaceHolder 
-	dropdown:SetAttribute("Searchable", true)
+			function initelement:PlayerDropdown(PlayerDropdown)
+    local data = {
+        Title = PlayerDropdown.Title or "Player Dropdown";
+        PlaceHolder = PlayerDropdown.PlaceHolder or "Select Player...";
+        Multi = PlayerDropdown.Multi or false;
+        MaxSelect = PlayerDropdown.MaxSelect or math.huge;
+        CallBack = PlayerDropdown.CallBack;
+    }
 
-	local DropOpen = false
-	local DeBounce = false
-	local OptionButton = dropdown.dropholder.drop.Container.Option
-	local SelectedOptions = {} -- {[UserId] = {Name = "DisplayName (Username)", Left = false}}
-	local SelectedOrder = {} -- Lista de UserIds na ordem
-	local OfflineSelected = {} -- Armazena jogadores selecionados que saíram {[UserId] = true}
-	
-	local PlayersService = game:GetService("Players")
-	local PlayersList = {} -- Cache de jogadores atuais {[UserId] = PlayerObject}
-	
-	-- Função para obter o thumbnail do jogador
-	local function GetPlayerThumbnail(userId)
-		local success, thumbnail = pcall(function()
-			return PlayersService:GetUserThumbnailAsync(userId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size60x60)
-		end)
-		if success and thumbnail then
-			return thumbnail
-		end
-		return "rbxasset://textures/ui/GuiImagePlaceholder.png"
-	end
-	
-	-- Função para formatar o nome do jogador
-	local function FormatPlayerName(player)
-		return player.DisplayName .. " (" .. player.Name .. ")"
-	end
-	
-	-- Verifica se um jogador está no servidor
-	local function IsPlayerInServer(userId)
-		return PlayersList[userId] ~s nil
-	end
-	
-	-- Atualiza a UI de todos os options baseado no estado do jogador
-	local function UpdatePlayerOptionState(option, player, isSelected, isOffline)
-		if not option or not option.Parent then return end
-		
-		if isOffline then
-			-- Jogador offline/desconectado - estilo vermelho
-			tweenservice:Create(option, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {
-				BackgroundColor3 = Color3.fromRGB(60, 30, 30),
-				BackgroundTransparency = 0
-			}):Play()
-			tweenservice:Create(option.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {
-				TextColor3 = Color3.fromRGB(255, 100, 100),
-				TextTransparency = 0
-			}):Play()
-			tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {
-				ImageTransparency = 0.5,
-				ImageColor3 = Color3.fromRGB(255, 100, 100)
-			}):Play()
-		elseif isSelected then
-			-- Jogador selecionado
-			tweenservice:Create(option, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {
-				BackgroundColor3 = Color3.fromRGB(39, 39, 39),
-				BackgroundTransparency = 0
-			}):Play()
-			tweenservice:Create(option.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {
-				TextColor3 = Color3.fromRGB(255, 255, 255),
-				TextTransparency = 0
-			}):Play()
-			tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {
-				ImageTransparency = 0,
-				ImageColor3 = Color3.fromRGB(255, 255, 255)
-			}):Play()
-		else
-			-- Jogador normal não selecionado
-			tweenservice:Create(option, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {
-				BackgroundColor3 = Color3.fromRGB(33, 33, 33),
-				BackgroundTransparency = 0
-			}):Play()
-			tweenservice:Create(option.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {
-				TextColor3 = Color3.fromRGB(200, 200, 200),
-				TextTransparency = 0
-			}):Play()
-			tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {
-				ImageTransparency = 0.7,
-				ImageColor3 = Color3.fromRGB(255, 255, 255)
-			}):Play()
-		end
-		
-		-- Atualizar o ícone de check
-		local checkTransparency = isSelected and 0 or 1
-		tweenservice:Create(option.ImageLabelCheck, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {
-			ImageTransparency = checkTransparency
-		}):Play()
-	end
-	
-	-- Atualiza o texto do dropdown mostrando quantos selecionados
-	local function UpdateSelectedText()
-		local selectedContainer = dropdown.dropholder.drop.selectContainer.ScrollingFrame
-		local placeholderText = dropdown.dropholder.drop.selected
-		
-		if #SelectedOrder == 0 then
-			placeholderText.Visible = true
-			placeholderText.Text = data.PlaceHolder
-			selectedContainer.Visible = false
-			return
-		end
-		
-		placeholderText.Visible = true
-		if #SelectedOrder == 1 then
-			local first = SelectedOptions[SelectedOrder[1]]
-			if first then
-				placeholderText.Text = first.Name
-			end
-		else
-			placeholderText.Text = #SelectedOrder .. " players selected"
-		end
-		
-		selectedContainer.Visible = data.Multi and #SelectedOrder > 0
-		
-		-- Limpar chips existentes
-		for _, child in ipairs(selectedContainer:GetChildren()) do
-			if child:IsA("Frame") then
-				child:Destroy()
-			end
-		end
-		
-		-- Criar chips para cada selecionado
-		for _, userId in ipairs(SelectedOrder) do
-			local playerData = SelectedOptions[userId]
-			if playerData then
-				local isOffline = playerData.Left == true
-				
-				local optionGroup = selectedContainer.result:Clone()
-				optionGroup.Visible = true
-				optionGroup.Name = tostring(userId)
-				optionGroup.TextLabel.Text = playerData.Name
-				
-				-- Estilo do chip (vermelho se offline)
-				if isOffline then
-					optionGroup.BackgroundColor3 = Color3.fromRGB(60, 30, 30)
-					optionGroup.TextLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-				end
-				
-				-- Botão de remover
-				optionGroup.X.MouseButton1Click:Connect(function()
-					-- Deselecionar o jogador
-					if SelectedOptions[userId] then
-						if OfflineSelected[userId] then
-							OfflineSelected[userId] = nil
-						end
-						SelectedOptions[userId] = nil
-						for i = #SelectedOrder, 1, -1 do
-							if SelectedOrder[i] == userId then
-								table.remove(SelectedOrder, i)
-								break
-							end
-						end
-						
-						-- Atualizar UI do option na lista dropdown
-						for _, opt in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
-							if opt:IsA("Frame") and opt.Name == tostring(userId) then
-								UpdatePlayerOptionState(opt, nil, false, false)
-							end
-						end
-						
-						UpdateSelectedText()
-						
-						if data.CallBack then
-							local selectedPlayers = {}
-							for _, uid in ipairs(SelectedOrder) do
-								local pData = SelectedOptions[uid]
-								if pData and not pData.Left then
-									local player = PlayersList[uid]
-									if player then
-										table.insert(selectedPlayers, player)
-									end
-								end
-							end
-							data.CallBack(selectedPlayers, SelectedOrder)
-						end
-						SaveConfig()
-					end
-				end)
-				
-				optionGroup.Parent = selectedContainer
-				
-				task.defer(function()
-					local padding = 40
-					local textWidth = optionGroup.TextLabel.TextBounds.X
-					local totalWidth = textWidth + padding
-					optionGroup.TextLabel.Size = UDim2.new(0, textWidth, 1, 0)
-					tweenservice:Create(optionGroup, TweenInfo.new(0.67, Enum.EasingStyle.Exponential), {
-						Size = UDim2.new(0, totalWidth, 0, 20)
-					}):Play()
-				end)
-			end
-		end
-	end
-	
-	-- Função principal para selecionar/deselecionar jogador
-	local function TogglePlayerSelection(userId, playerName, isOffline)
-		if SelectedOptions[userId] then
-			-- Deselecionar
-			if OfflineSelected[userId] then
-				OfflineSelected[userId] = nil
-			end
-			SelectedOptions[userId] = nil
-			for i = #SelectedOrder, 1, -1 do
-				if SelectedOrder[i] == userId then
-					table.remove(SelectedOrder, i)
-					break
-				end
-			end
-			return false
-		else
-			-- Selecionar - verificar limite
-			if data.MaxSelect > 0 and #SelectedOrder >= data.MaxSelect then
-				syde:Notify({
-					Title = "Selection Limit",
-					Content = "You can only select " .. data.MaxSelect .. " player" .. (data.MaxSelect > 1 and "s" or ""),
-					Duration = 3,
-					Icon = "129639694885441"
-				})
-				return false
-			end
-			
-			SelectedOptions[userId] = {
-				Name = playerName,
-				Left = isOffline or false
-			}
-			if isOffline then
-				OfflineSelected[userId] = true
-			end
-			table.insert(SelectedOrder, userId)
-			return true
-		end
-	end
-	
-	-- Cria/atualiza a lista de jogadores no dropdown
-	local function RefreshPlayersList()
-		-- Limpar options existentes (exceto template)
-		for _, child in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
-			if child:IsA("Frame") and child.Name ~= "Option" then
-				child:Destroy()
-			end
-		end
-		
-		-- Adicionar jogadores atuais como opções
-		for userId, player in pairs(PlayersList) do
-			local playerName = FormatPlayerName(player)
-			local isSelected = SelectedOptions[userId] ~= nil
-			local isOffline = false
-			
-			local option = OptionButton:Clone()
-			option.Title.Text = playerName
-			option.Parent = dropdown.dropholder.drop.Container
-			option.Visible = true
-			option.Name = tostring(userId)
-			
-			-- Carregar thumbnail
-			task.spawn(function()
-				local thumbnail = GetPlayerThumbnail(userId)
-				option.ImageLabel.Image = thumbnail
-				option.ImageLabelCheck.Image = "rbxassetid://129639694885441" -- ícone de check
-			end)
-			
-			UpdatePlayerOptionState(option, player, isSelected, isOffline)
-			
-			-- Evento de clique
-			option.Interact.MouseButton1Click:Connect(function()
-				local currentIsSelected = SelectedOptions[userId] ~= nil
-				local newState = TogglePlayerSelection(userId, playerName, false)
-				
-				if newState ~= currentIsSelected then
-					UpdatePlayerOptionState(option, player, newState, false)
-					UpdateSelectedText()
-					
-					-- Callback com lista de jogadores selecionados
-					if data.CallBack then
-						local selectedPlayers = {}
-						for _, uid in ipairs(SelectedOrder) do
-							local pData = SelectedOptions[uid]
-							if pData and not pData.Left then
-								local p = PlayersList[uid]
-								if p then
-									table.insert(selectedPlayers, p)
-								end
-							end
-						end
-						data.CallBack(selectedPlayers, SelectedOrder)
-					end
-					SaveConfig()
-				end
-			end)
-		end
-		
-		-- Adicionar jogadores offline que estavam selecionados
-		for userId, _ in pairs(OfflineSelected) do
-			if not PlayersList[userId] and SelectedOptions[userId] then
-				local playerData = SelectedOptions[userId]
-				local option = OptionButton:Clone()
-				option.Title.Text = playerData.Name .. " (Offline)"
-				option.Parent = dropdown.dropholder.drop.Container
-				option.Visible = true
-				option.Name = tostring(userId)
-				
-				task.spawn(function()
-					local thumbnail = GetPlayerThumbnail(userId)
-					option.ImageLabel.Image = thumbnail
-				end)
-				
-				UpdatePlayerOptionState(option, nil, true, true)
-				
-				option.Interact.MouseButton1Click:Connect(function()
-					-- Deselecionar jogador offline
-					if SelectedOptions[userId] then
-						OfflineSelected[userId] = nil
-						SelectedOptions[userId] = nil
-						for i = #SelectedOrder, 1, -1 do
-							if SelectedOrder[i] == userId then
-								table.remove(SelectedOrder, i)
-								break
-							end
-						end
-						option:Destroy()
-						UpdateSelectedText()
-						
-						if data.CallBack then
-							local selectedPlayers = {}
-							for _, uid in ipairs(SelectedOrder) do
-								local pData = SelectedOptions[uid]
-								if pData and not pData.Left then
-									local p = PlayersList[uid]
-									if p then
-										table.insert(selectedPlayers, p)
-									end
-								end
-							end
-							data.CallBack(selectedPlayers, SelectedOrder)
-						end
-						SaveConfig()
-					end
-				end)
-			end
-		end
-		
-		-- Reordenar layout
-		local yOffset = 0
-		for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
-			if option:IsA("Frame") and option.Visible then
-				tweenservice:Create(option, TweenInfo.new(0.3, Enum.EasingStyle.Quint), {
-					Position = UDim2.new(0, 0, 0, yOffset)
-				}):Play()
-				yOffset = yOffset + option.Size.Y.Offset + 5
-			end
-		end
-	end
-	
-	-- Busca
-	dropdown.dropholder.drop.search.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
-		local searchText = dropdown.dropholder.drop.search.TextBox.Text:lower()
-		
-		for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
-			if option:IsA("Frame") and option:FindFirstChild("Title") then
-				local optionText = option.Title.Text:lower()
-				local shouldShow = searchText == "" or optionText:find(searchText, 1, true)
-				option.Visible = shouldShow
-			end
-		end
-	end)
-	
-	-- Eventos de abrir/fechar dropdown
-	dropdown.dropholder.drop.down.MouseButton1Click:Connect(function()
-		if DeBounce then return end
-		DeBounce = true
-		
-		if DropOpen then
-			DropOpen = false
-			tweenservice:Create(dropdown, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 95) }):Play()
-			tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
-			tweenservice:Create(dropdown.dropholder.drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-			tweenservice:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
-			task.wait(0.6)
-			dropdown.dropholder.drop.Container.Visible = false
-		else
-			DropOpen = true
-			RefreshPlayersList() -- Atualiza lista antes de abrir
-			dropdown.dropholder.drop.Container.Visible = true
-			dropdown.dropholder.drop.search.Visible = true
-			
-			tweenservice:Create(dropdown, TweenInfo.new(1.34, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 350) }):Play()
-			tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
-			tweenservice:Create(dropdown.dropholder.drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-			tweenservice:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 180 }):Play()
-		end
-		
-		task.delay(0.5, function()
-			DeBounce = false
-		end)
-	end)
-	
-	-- Rastrear entrada/saída de jogadores
-	local function OnPlayerAdded(player)
-		PlayersList[player.UserId] = player
-		
-		-- Verificar se este jogador estava nos OfflineSelected
-		if OfflineSelected[player.UserId] then
-			-- Re-selecionar automaticamente
-			local playerName = FormatPlayerName(player)
-			if not SelectedOptions[player.UserId] then
-				SelectedOptions[player.UserId] = {
-					Name = playerName,
-					Left = false
-				}
-				table.insert(SelectedOrder, player.UserId)
-				OfflineSelected[player.UserId] = nil
-				UpdateSelectedText()
-				
-				if data.CallBack then
-					local selectedPlayers = {}
-					for _, uid in ipairs(SelectedOrder) do
-						local pData = SelectedOptions[uid]
-						if pData and not pData.Left then
-							local p = PlayersList[uid]
-							if p then
-								table.insert(selectedPlayers, p)
-							end
-						end
-					end
-					data.CallBack(selectedPlayers, SelectedOrder)
-				end
-				
-				syde:Notify({
-					Title = "Player Reconnected",
-					Content = playerName .. " has reconnected and was re-selected.",
-					Duration = 3,
-					Icon = "129639694885441"
-				})
-			end
-		end
-		
-		-- Se o dropdown estiver aberto, atualizar a lista
-		if DropOpen then
-			RefreshPlayersList()
-		end
-	end
-	
-	local function OnPlayerRemoving(player)
-		local userId = player.UserId
-		PlayersList[userId] = nil
-		
-		-- Se este jogador estava selecionado, marcar como offline
-		if SelectedOptions[userId] then
-			SelectedOptions[userId].Left = true
-			OfflineSelected[userId] = true
-			UpdateSelectedText()
-			
-			if data.CallBack then
-				local selectedPlayers = {}
-				for _, uid in ipairs(SelectedOrder) do
-					local pData = SelectedOptions[uid]
-					if pData and not pData.Left then
-						local p = PlayersList[uid]
-						if p then
-							table.insert(selectedPlayers, p)
-						end
-					end
-				end
-				data.CallBack(selectedPlayers, SelectedOrder)
-			end
-		end
-		
-		-- Se o dropdown estiver aberto, atualizar a lista
-		if DropOpen then
-			RefreshPlayersList()
-		end
-	end
-	
-	-- Conectar eventos
-	for _, player in ipairs(PlayersService:GetPlayers()) do
-		PlayersList[player.UserId] = player
-	end
-	
-	PlayersService.PlayerAdded:Connect(OnPlayerAdded)
-	PlayersService.PlayerRemoving:Connect(OnPlayerRemoving)
-	
-	-- Inicializar lista
-	task.defer(function()
-		RefreshPlayersList()
-	end)
-	
-	-- Função pública para obter jogadores selecionados
-	function data:GetSelectedPlayers()
-		local selected = {}
-		for _, userId in ipairs(SelectedOrder) do
-			local playerData = SelectedOptions[userId]
-			if playerData and not playerData.Left then
-				local player = PlayersList[userId]
-				if player then
-					table.insert(selected, player)
-				end
-			end
-		end
-		return selected
-	end
-	
-	-- Função pública para obter UserIds selecionados
-	function data:GetSelectedUserIds()
-		return SelectedOrder
-	end
-	
-	-- Função pública para selecionar um jogador por UserId
-	function data:SelectPlayer(userId)
-		local player = PlayersList[userId]
-		if player then
-			local playerName = FormatPlayerName(player)
-			if not SelectedOptions[userId] then
-				if data.MaxSelect > 0 and #SelectedOrder >= data.MaxSelect then
-					syde:Notify({
-						Title = "Selection Limit",
-						Content = "You can only select " .. data.MaxSelect .. " player" .. (data.MaxSelect > 1 and "s" or ""),
-						Duration = 3
-					})
-					return false
-				end
-				SelectedOptions[userId] = { Name = playerName, Left = false }
-				table.insert(SelectedOrder, userId)
-				UpdateSelectedText()
-				if DropOpen then RefreshPlayersList() end
-				if data.CallBack then
-					data.CallBack(self:GetSelectedPlayers(), SelectedOrder)
-				end
-				SaveConfig()
-				return true
-			end
-		end
-		return false
-	end
-	
-	-- Função pública para deselecionar um jogador
-	function data:DeselectPlayer(userId)
-		if SelectedOptions[userId] then
-			if OfflineSelected[userId] then
-				OfflineSelected[userId] = nil
-			end
-			SelectedOptions[userId] = nil
-			for i = #SelectedOrder, 1, -1 do
-				if SelectedOrder[i] == userId then
-					table.remove(SelectedOrder, i)
-					break
-				end
-			end
-			UpdateSelectedText()
-			if DropOpen then RefreshPlayersList() end
-			if data.CallBack then
-				data.CallBack(self:GetSelectedPlayers(), SelectedOrder)
-			end
-			SaveConfig()
-			return true
-		end
-		return false
-	end
-	
-	-- Carregar configuração salva
-	if syde.ConfigEnabled then
-		if data.Flag and syde.Flags[data.Flag] and syde.Flags[data.Flag].V then
-			local savedUserIds = syde.Flags[data.Flag].V
-			if type(savedUserIds) == "table" then
-				for _, userId in ipairs(savedUserIds) do
-					local player = PlayersList[userId]
-					if player then
-						data:SelectPlayer(userId)
-					else
-						-- Jogador não está mais no servidor, marcar como offline
-						SelectedOptions[userId] = { Name = "Unknown Player (" .. userId .. ")", Left = true }
-						OfflineSelected[userId] = true
-						table.insert(SelectedOrder, userId)
-					end
-				end
-				UpdateSelectedText()
-			end
-		end
-	end
-	
-	return data
+    local Players = game:GetService("Players")
+
+    local dropdown = pages.page.Dropdown:Clone()
+    dropdown.Visible = true
+    dropdown.Parent = Page
+    dropdown.title.Text = data.Title
+    dropdown.Name = data.Title
+    dropdown.dropholder.drop.Container.Option.Visible = false
+    dropdown.dropholder.drop.Container.Visible = false
+    tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
+    dropdown.dropholder.drop.selected.Text = data.PlaceHolder
+    dropdown:SetAttribute("Searchable", true)
+
+    local DropOpen = false
+    local DeBounce = false
+    local OptionButton = dropdown.dropholder.drop.Container.Option
+    local SelectedPlayers = {} -- [userId] = true
+    local SelectedOrder = {} -- lista de userIds
+    local OfflinePlayers = {} -- [userId] = {name, displayName, userId}
+    local OptionFrames = {} -- [userId] = frame
+
+    local function UpdateCustomLayout()
+        local yOffset = 0
+        for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
+            if option:IsA("Frame") and option.Visible then
+                tweenservice:Create(option, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {Position = UDim2.new(0, 0, 0, yOffset)}):Play()
+                yOffset = yOffset + option.Size.Y.Offset + 7
+            end
+        end
+    end
+
+    local function OpenDrop()
+        DropOpen = true
+        dropdown.dropholder.drop.Container.Visible = true
+        dropdown.dropholder.drop.search.Visible = true
+
+        tweenservice:Create(dropdown, TweenInfo.new(1.34, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 300) }):Play()
+        tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -20, 1, -75) }):Play()
+        tweenservice:Create(dropdown.dropholder.drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+        tweenservice:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 180 }):Play()
+
+        tweenservice:Create(dropdown.dropholder.drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.65 }):Play()
+        tweenservice:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0.4 }):Play()
+        tweenservice:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+        tweenservice:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.9 }):Play()
+        tweenservice:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.85 }):Play()
+    end
+
+    local function CloseDrop()
+        DropOpen = false
+        tweenservice:Create(dropdown, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(1, -35, 0, 95) }):Play()
+        tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20, 0.576, -75) }):Play()
+        tweenservice:Create(dropdown.dropholder.drop.v0, TweenInfo.new(1.34, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+        tweenservice:Create(dropdown.dropholder.drop.down, TweenInfo.new(0.35, Enum.EasingStyle.Quint), { Rotation = 0 }):Play()
+
+        tweenservice:Create(dropdown.dropholder.drop.search, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+        tweenservice:Create(dropdown.dropholder.drop.search.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+        tweenservice:Create(dropdown.dropholder.drop.search.TextBox, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+        tweenservice:Create(dropdown.dropholder.drop.search.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+        tweenservice:Create(dropdown.dropholder.drop.search.icon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+
+        task.wait(0.6)
+        dropdown.dropholder.drop.Container.Visible = false
+        dropdown.dropholder.drop.search.Visible = false
+    end
+
+    dropdown.dropholder.drop.down.MouseButton1Click:Connect(function()
+        if DeBounce then return end
+        DeBounce = true
+
+        if DropOpen then
+            CloseDrop()
+        else
+            OpenDrop()
+        end
+
+        task.delay(1.2, function()
+            DeBounce = false
+        end)
+    end)
+
+    -- Retorna lista de userIds selecionados com info
+    local function GetSelectedInfo()
+        local result = {}
+        for _, userId in ipairs(SelectedOrder) do
+            local player = Players:GetPlayerByUserId(userId)
+            if player then
+                table.insert(result, {
+                    userId = userId,
+                    name = player.Name,
+                    displayName = player.DisplayName,
+                    online = true
+                })
+            elseif OfflinePlayers[userId] then
+                local info = OfflinePlayers[userId]
+                table.insert(result, {
+                    userId = userId,
+                    name = info.name,
+                    displayName = info.displayName,
+                    online = false
+                })
+            end
+        end
+        return result
+    end
+
+    local function UpdateSelectedText()
+        local selectedContainer = dropdown.dropholder.drop.selectContainer.ScrollingFrame
+        selectedContainer.Visible = data.Multi
+        dropdown.dropholder.drop.selected.Visible = false
+
+        if data.Multi then
+            if #SelectedOrder == 0 then
+                dropdown.dropholder.drop.selected.Visible = true
+                dropdown.dropholder.drop.selected.Text = data.PlaceHolder
+                selectedContainer.Visible = false
+                return
+            end
+
+            -- Limpa chips que não estão mais selecionados
+            for _, child in ipairs(selectedContainer:GetChildren()) do
+                if child:IsA("Frame") and child.Name ~= "result" then
+                    local found = false
+                    for _, uid in ipairs(SelectedOrder) do
+                        if tostring(uid) == child.Name then
+                            found = true
+                            break
+                        end
+                    end
+                    if not found then
+                        child:Destroy()
+                    end
+                end
+            end
+
+            for _, userId in ipairs(SelectedOrder) do
+                local key = tostring(userId)
+                if not selectedContainer:FindFirstChild(key) then
+                    local player = Players:GetPlayerByUserId(userId)
+                    local displayName = player and player.DisplayName or (OfflinePlayers[userId] and OfflinePlayers[userId].displayName or "?")
+                    local userName = player and player.Name or (OfflinePlayers[userId] and OfflinePlayers[userId].name or "?")
+                    local isOnline = player ~= nil
+
+                    local optionGroup = selectedContainer.result:Clone()
+                    optionGroup.Visible = true
+                    optionGroup.Name = key
+                    optionGroup.TextLabel.Text = displayName .. " (" .. userName .. ")"
+
+                    if not isOnline then
+                        optionGroup.TextLabel.TextColor3 = Color3.fromRGB(255, 200, 50)
+                    end
+
+                    optionGroup.X.MouseButton1Click:Connect(function()
+                        -- Remove da seleção
+                        SelectedPlayers[userId] = nil
+                        for i = #SelectedOrder, 1, -1 do
+                            if SelectedOrder[i] == userId then
+                                table.remove(SelectedOrder, i)
+                                break
+                            end
+                        end
+
+                        -- Se estava offline, para de armazenar
+                        if not Players:GetPlayerByUserId(userId) then
+                            OfflinePlayers[userId] = nil
+                            -- Remove da lista visual
+                            if OptionFrames[userId] then
+                                OptionFrames[userId]:Destroy()
+                                OptionFrames[userId] = nil
+                            end
+                        else
+                            -- Volta visual normal
+                            if OptionFrames[userId] then
+                                tweenservice:Create(OptionFrames[userId], TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
+                                tweenservice:Create(OptionFrames[userId].ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0.9}):Play()
+                                if OptionFrames[userId]:FindFirstChild("offlineBadge") then
+                                    OptionFrames[userId].offlineBadge.Visible = false
+                                end
+                            end
+                        end
+
+                        UpdateSelectedText()
+                        UpdateCustomLayout()
+
+                        if data.CallBack then
+                            data.CallBack(GetSelectedInfo())
+                        end
+                    end)
+
+                    optionGroup.Parent = selectedContainer
+
+                    task.defer(function()
+                        local padding = 40
+                        local textWidth = optionGroup.TextLabel.TextBounds.X
+                        local totalWidth = textWidth + padding
+                        optionGroup.TextLabel.Size = UDim2.new(0, textWidth, 1, 0)
+                        tweenservice:Create(optionGroup, TweenInfo.new(0.67, Enum.EasingStyle.Exponential), {Size = UDim2.new(0, totalWidth, 0, 20)}):Play()
+                    end)
+                end
+            end
+        else
+            dropdown.dropholder.drop.selected.Visible = true
+            if #SelectedOrder > 0 then
+                local userId = SelectedOrder[1]
+                local player = Players:GetPlayerByUserId(userId)
+                if player then
+                    dropdown.dropholder.drop.selected.Text = player.DisplayName .. " (" .. player.Name .. ")"
+                elseif OfflinePlayers[userId] then
+                    dropdown.dropholder.drop.selected.Text = OfflinePlayers[userId].displayName .. " (" .. OfflinePlayers[userId].name .. ") [offline]"
+                end
+            else
+                dropdown.dropholder.drop.selected.Text = data.PlaceHolder
+            end
+        end
+    end
+
+    -- Cria frame de opção para um jogador
+    local function CreatePlayerOption(player)
+        local userId = player.UserId
+
+        if OptionFrames[userId] then return end -- já existe
+
+        local option = OptionButton:Clone()
+        option.Parent = dropdown.dropholder.drop.Container
+        option.Visible = true
+        option.Name = player.Name
+
+        -- Thumbnail do jogador
+        local thumbType = Enum.ThumbnailType.HeadShot
+        local thumbSize = Enum.ThumbnailSize.Size48x48
+        local ok, img = pcall(function()
+            return Players:GetUserThumbnailAsync(userId, thumbType, thumbSize)
+        end)
+
+        -- Adiciona icon do jogador na esquerda
+        local iconLabel = Instance.new("ImageLabel")
+        iconLabel.Name = "PlayerIcon"
+        iconLabel.Size = UDim2.new(0, 24, 0, 24)
+        iconLabel.Position = UDim2.new(0, 8, 0.5, -12)
+        iconLabel.BackgroundTransparency = 1
+        iconLabel.Image = ok and img or "rbxassetid://0"
+        iconLabel.Parent = option
+
+        local uiCorner = Instance.new("UICorner")
+        uiCorner.CornerRadius = UDim.new(1, 0)
+        uiCorner.Parent = iconLabel
+
+        -- Ajusta título com displayname e username
+        if option:FindFirstChild("Title") then
+            option.Title.Text = player.DisplayName .. " (" .. player.Name .. ")"
+            option.Title.Position = UDim2.new(0, 40, 0, 0)
+            option.Title.Size = UDim2.new(1, -50, 1, 0)
+        end
+
+        -- Badge offline (oculto por padrão)
+        local offlineBadge = Instance.new("Frame")
+        offlineBadge.Name = "offlineBadge"
+        offlineBadge.Size = UDim2.new(0, 8, 0, 8)
+        offlineBadge.Position = UDim2.new(0, 26, 0.5, -4)
+        offlineBadge.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+        offlineBadge.BorderSizePixel = 0
+        offlineBadge.Visible = false
+        offlineBadge.ZIndex = 5
+        local badgeCorner = Instance.new("UICorner")
+        badgeCorner.CornerRadius = UDim.new(1, 0)
+        badgeCorner.Parent = offlineBadge
+        offlineBadge.Parent = option
+
+        OptionFrames[userId] = option
+
+        -- Estado visual se já estava selecionado
+        if SelectedPlayers[userId] then
+            tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
+            tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
+        end
+
+        option.Interact.MouseButton1Click:Connect(function()
+            if data.Multi then
+                if SelectedPlayers[userId] then
+                    -- Desseleciona
+                    SelectedPlayers[userId] = nil
+                    for i = #SelectedOrder, 1, -1 do
+                        if SelectedOrder[i] == userId then
+                            table.remove(SelectedOrder, i)
+                            break
+                        end
+                    end
+                    tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
+                    tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0.9}):Play()
+                else
+                    -- Verifica limite
+                    if #SelectedOrder >= data.MaxSelect then
+                        local limitNum = data.MaxSelect == math.huge and "N/A" or tostring(data.MaxSelect)
+                        syde:Notify({
+                            Title = "Limite atingido",
+                            Content = "Só pode selecionar " .. limitNum .. " jogadores",
+                            Duration = 3
+                        })
+                        return
+                    end
+                    -- Seleciona
+                    SelectedPlayers[userId] = true
+                    table.insert(SelectedOrder, userId)
+                    tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
+                    tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
+                end
+
+                UpdateSelectedText()
+                UpdateCustomLayout()
+
+                if data.CallBack then
+                    data.CallBack(GetSelectedInfo())
+                end
+            else
+                -- Single select
+                for uid, _ in pairs(SelectedPlayers) do
+                    SelectedPlayers[uid] = nil
+                    if OptionFrames[uid] then
+                        tweenservice:Create(OptionFrames[uid], TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
+                        tweenservice:Create(OptionFrames[uid].ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0.9}):Play()
+                    end
+                end
+                SelectedOrder = {}
+
+                SelectedPlayers[userId] = true
+                table.insert(SelectedOrder, userId)
+                tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
+                tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
+
+                UpdateSelectedText()
+                UpdateCustomLayout()
+
+                if data.CallBack then
+                    data.CallBack(GetSelectedInfo())
+                end
+
+                CloseDrop()
+            end
+        end)
+
+        UpdateCustomLayout()
+    end
+
+    -- Popula com jogadores atuais
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= Players.LocalPlayer then
+            CreatePlayerOption(player)
+        end
+    end
+
+    -- Jogador entra
+    Players.PlayerAdded:Connect(function(player)
+        local userId = player.UserId
+
+        -- Se estava armazenado como offline e selecionado, auto-reseleciona
+        if OfflinePlayers[userId] then
+            OfflinePlayers[userId] = nil
+        end
+
+        task.wait(0.5) -- espera thumbnail carregar
+        CreatePlayerOption(player)
+
+        -- Se estava selecionado antes (estava offline), restaura visualmente
+        if SelectedPlayers[userId] then
+            if OptionFrames[userId] then
+                tweenservice:Create(OptionFrames[userId], TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
+                tweenservice:Create(OptionFrames[userId].ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
+                if OptionFrames[userId]:FindFirstChild("offlineBadge") then
+                    OptionFrames[userId].offlineBadge.Visible = false
+                end
+            end
+            UpdateSelectedText()
+            if data.CallBack then
+                data.CallBack(GetSelectedInfo())
+            end
+        end
+    end)
+
+    -- Jogador sai
+    Players.PlayerRemoving:Connect(function(player)
+        local userId = player.UserId
+
+        if SelectedPlayers[userId] then
+            -- Armazena info do jogador offline
+            OfflinePlayers[userId] = {
+                name = player.Name,
+                displayName = player.DisplayName,
+                userId = userId
+            }
+
+            -- Marca visualmente como offline (vermelho)
+            if OptionFrames[userId] then
+                tweenservice:Create(OptionFrames[userId], TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {
+                    BackgroundColor3 = Color3.fromRGB(60, 20, 20)
+                }):Play()
+                if OptionFrames[userId]:FindFirstChild("Title") then
+                    tweenservice:Create(OptionFrames[userId].Title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {
+                        TextColor3 = Color3.fromRGB(255, 80, 80)
+                    }):Play()
+                end
+                if OptionFrames[userId]:FindFirstChild("offlineBadge") then
+                    OptionFrames[userId].offlineBadge.Visible = true
+                end
+            end
+
+            -- Atualiza chip no selectedContainer se multi
+            if data.Multi then
+                local selectedContainer = dropdown.dropholder.drop.selectContainer.ScrollingFrame
+                local chip = selectedContainer:FindFirstChild(tostring(userId))
+                if chip and chip:FindFirstChild("TextLabel") then
+                    tweenservice:Create(chip.TextLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {
+                        TextColor3 = Color3.fromRGB(255, 80, 80)
+                    }):Play()
+                end
+            else
+                UpdateSelectedText()
+            end
+
+            if data.CallBack then
+                data.CallBack(GetSelectedInfo())
+            end
+        else
+            -- Não estava selecionado, remove da lista normalmente
+            if OptionFrames[userId] then
+                OptionFrames[userId]:Destroy()
+                OptionFrames[userId] = nil
+            end
+        end
+
+        UpdateCustomLayout()
+    end)
+
+    -- Search
+    dropdown.dropholder.drop.search.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
+        local searchText = dropdown.dropholder.drop.search.TextBox.Text:lower()
+
+        for _, option in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
+            if option:IsA("Frame") and option:FindFirstChild("Title") then
+                local isTemplate = option.Name == "Option"
+                if isTemplate then continue end
+
+                local optionText = option.Title.Text:lower()
+                local shouldShow = searchText == "" or optionText:find(searchText, 1, true)
+
+                if shouldShow then
+                    option.Visible = true
+                else
+                    option.Visible = false
+                end
+            end
+        end
+
+        UpdateCustomLayout()
+    end)
+
+    return data
 end
 
 			function telement:Slider(Slider)
