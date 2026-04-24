@@ -1,10 +1,10 @@
 --[[
 
-888888  .dP"Y8 88     88 8888b.  .dP"Y8 888888 ZZZZZZ
-88__    `Ybo." 88     88  8I  Yb `Ybo." 88__     ZZ  
-88""    o.`Y8b 88  .o 88  8I  dY o.`Y8b 88""    ZZ   
-888888  8bodP' 88ood8 88 8888Y"  8bodP' 888888 ZZZZZZ
-v1.0
+.dP"Y8 Yb  dP 8888b.  888888 
+`Ybo."  YbdP   8I  Yb 88__   
+o.`Y8b   8P    8I  dY 88""   
+8bodP'  dP    8888Y"  888888  v0
+
 ]]
 
 local inputservice =	game:GetService("InsertService")
@@ -5252,16 +5252,33 @@ function syde:Init(library)
 			end
 
 			function telement:PlayerDropdown(PlayerDropdown)
+				local PlayerService = game:GetService("Players")
+				
 				local data = {
 					Title = PlayerDropdown.Title or "Select Players";
+					Options = {};
+					StarterOption = nil;
 					PlaceHolder = PlayerDropdown.PlaceHolder or "Select players...";
+					Multi = true;
 					CallBack = PlayerDropdown.CallBack;
 					Flag = PlayerDropdown.Flag;
 					SFlag = PlayerDropdown.SFlag;
-					V = PlayerDropdown.StarterValue or {};
 					Type = "PlayerDropdown";
 				}
 
+				local LeftPlayers = {}
+
+				-- Função para atualizar opções de jogadores
+				local function RefreshPlayerOptions()
+					data.Options = {}
+					for _, player in ipairs(PlayerService:GetPlayers()) do
+						table.insert(data.Options, player.Name)
+					end
+				end
+
+				RefreshPlayerOptions()
+
+				-- Criar usando o Dropdown nativo
 				local dropdown = window.settings.pages.page.Dropdown:Clone()
 				dropdown.Visible = true
 				dropdown.Parent = Page
@@ -5270,17 +5287,13 @@ function syde:Init(library)
 				dropdown.dropholder.drop.Container.Option.Visible = false
 				dropdown.dropholder.drop.Container.Visible = false
 				tweenservice:Create(dropdown.dropholder.drop.Container, TweenInfo.new(1, Enum.EasingStyle.Quint), { Size = UDim2.new(0.33, -20,0.576, -75) }):Play()
-				dropdown.dropholder.drop.selected.Text = data.PlaceHolder 
+				dropdown.dropholder.drop.selected.Text = data.PlaceHolder
 
 				local DropOpen = false
 				local DeBounce = false
 				local OptionButton = dropdown.dropholder.drop.Container.Option
 				local SelectedOptions = {}
 				local SelectedOrder = {}
-				local LeftPlayers = {} -- Armazena jogadores que saíram
-				local PlayerObjects = {} -- Referência dos jogadores no dropdown
-
-				local PlayerService = game:GetService("Players")
 
 				local function UpdateCustomLayout()
 					local yOffset = 0
@@ -5344,54 +5357,32 @@ function syde:Init(library)
 					end)
 				end)
 
-				local function AddToSelected(playerName)
-					if not SelectedOptions[playerName] then
-						SelectedOptions[playerName] = true
-
-						local insertIndex = #SelectedOrder + 1
-						table.insert(SelectedOrder, insertIndex, playerName)
+				local function AddToSelected(option)
+					if not SelectedOptions[option] then
+						SelectedOptions[option] = true
+						table.insert(SelectedOrder, option)
 					end
 				end
 
-				local function RemoveFromSelected(playerName)
-					if SelectedOptions[playerName] then
-						SelectedOptions[playerName] = nil
+				local function RemoveFromSelected(option)
+					if SelectedOptions[option] then
+						SelectedOptions[option] = nil
 						for i = #SelectedOrder, 1, -1 do
-							if SelectedOrder[i] == playerName then
+							if SelectedOrder[i] == option then
 								table.remove(SelectedOrder, i)
 								break
 							end
 						end
 					end
 
-					-- Remove do armazenado se o jogador tiver saído
-					if LeftPlayers[playerName] then
-						LeftPlayers[playerName] = nil
+					if LeftPlayers[option] then
+						LeftPlayers[option] = nil
 					end
 
 					local selectedContainer = dropdown.dropholder.drop.selectContainer.ScrollingFrame
 					for _, child in ipairs(selectedContainer:GetChildren()) do
-						if child:IsA("Frame") and child.Name == playerName then
+						if child:IsA("Frame") and child.Name == option then
 							child:Destroy()
-							break
-						end
-					end
-				end
-
-				local function UpdatePlayerColor(playerName, isOffline)
-					for _, opt in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
-						if opt:IsA("Frame") and opt.Name == playerName then
-							if isOffline then
-								-- Jogador saiu - cor vermelha
-								tweenservice:Create(opt, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(150, 40, 40)}):Play()
-								tweenservice:Create(opt.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {Color = Color3.fromRGB(200, 80, 80)}):Play()
-								tweenservice:Create(opt.Title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextColor3 = Color3.fromRGB(255, 150, 150)}):Play()
-							else
-								-- Jogador entrou de volta - cor normal
-								tweenservice:Create(opt, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-								tweenservice:Create(opt.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {Color = Color3.fromRGB(87, 101, 242)}):Play()
-								tweenservice:Create(opt.Title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
-							end
 							break
 						end
 					end
@@ -5400,7 +5391,7 @@ function syde:Init(library)
 				local function UpdateSelectedText()
 					local selectedContainer = dropdown.dropholder.drop.selectContainer.ScrollingFrame
 					local placeholderText = dropdown.dropholder.drop.selected
-					selectedContainer.Visible = true
+					selectedContainer.Visible = data.Multi
 					dropdown.dropholder.drop.selected.Visible = false
 
 					if #SelectedOrder == 0 then
@@ -5409,30 +5400,26 @@ function syde:Init(library)
 						return
 					end
 
-					-- Criar chips para cada jogador selecionado
-					for _, playerName in ipairs(SelectedOrder) do
-						if not selectedContainer:FindFirstChild(playerName) then
+					for _, option in ipairs(SelectedOrder) do
+						if not selectedContainer:FindFirstChild(option) then
 							local optionGroup = selectedContainer.result:Clone()
 							optionGroup.Visible = true
-							optionGroup.Name = playerName
-							optionGroup.TextLabel.Text = playerName
+							optionGroup.Name = option
+							optionGroup.TextLabel.Text = option
 
-							-- Se o jogador saiu, mostrar indicador
-							if LeftPlayers[playerName] then
+							if LeftPlayers[option] then
 								optionGroup.TextLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
 								optionGroup.BackgroundColor3 = Color3.fromRGB(80, 30, 30)
 							end
 
-							-- Configurar botão de remover
 							optionGroup.X.MouseButton1Click:Connect(function()
-								RemoveFromSelected(playerName)
+								RemoveFromSelected(option)
 								UpdateSelectedText()
 
-								-- Atualizar visualmente a lista
 								for _, opt in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
-									if opt:IsA("Frame") and opt.Name == playerName then
-										tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
+									if opt:IsA("Frame") and opt.Name == option then
 										tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
+										tweenservice:Create(opt, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
 										tweenservice:Create(opt.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 										tweenservice:Create(opt.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0.5}):Play()
 										tweenservice:Create(opt.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {ImageTransparency = 0.9}):Play()
@@ -5457,7 +5444,6 @@ function syde:Init(library)
 					end
 				end
 
-				-- Busca de jogadores
 				dropdown.dropholder.drop.search.TextBox:GetPropertyChangedSignal("Text"):Connect(function()
 					local searchText = dropdown.dropholder.drop.search.TextBox.Text:lower()
 
@@ -5496,49 +5482,22 @@ function syde:Init(library)
 					UpdateCustomLayout()
 				end)
 
-				-- Monitora quando jogadores entram/saem
-				local function RefreshPlayerList()
-					-- Limpar container
-					for _, child in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
-						if child:IsA("Frame") and child.Name ~= "Option" then
-							child:Destroy()
-						end
-					end
-
-					SelectedOptions = {}
-					SelectedOrder = {}
-					PlayerObjects = {}
-
-					-- Adicionar cada jogador online
-					for _, player in ipairs(PlayerService:GetPlayers()) do
-						local playerName = player.Name
+				local function SetPlayerOptions()
+					local starterSet = false
+					for _, OptionText in ipairs(data.Options) do
 						local option = OptionButton:Clone()
-						option.Title.Text = playerName
+						option.Title.Text = OptionText
 						option.Parent = dropdown.dropholder.drop.Container
 						option.Visible = true
-						option.Name = playerName
-
-						PlayerObjects[playerName] = player
-
-						-- Se estava selecionado antes, manter selecionado
-						if LeftPlayers[playerName] then
-							SelectedOptions[playerName] = true
-							table.insert(SelectedOrder, playerName)
-							LeftPlayers[playerName] = nil -- Remove do armazenado
-
-							-- Cor especial - player estava offline mas voltou
-							tweenservice:Create(option, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
-							tweenservice:Create(option.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {ImageTransparency = 0}):Play()
-						end
+						option.Name = OptionText
 
 						option.Interact.MouseButton1Click:Connect(function()
-							if SelectedOptions[playerName] then
-								RemoveFromSelected(playerName)
+							if SelectedOptions[OptionText] then
+								RemoveFromSelected(OptionText)
 								tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
 								tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0.9}):Play()
-								UpdatePlayerColor(playerName, false)
 							else
-								AddToSelected(playerName)
+								AddToSelected(OptionText)
 								tweenservice:Create(option, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(39, 39, 39)}):Play()
 								tweenservice:Create(option.ImageLabel, TweenInfo.new(0.3), {ImageTransparency = 0}):Play()
 							end
@@ -5554,76 +5513,66 @@ function syde:Init(library)
 					UpdateCustomLayout()
 				end
 
-				RefreshPlayerList()
+				SetPlayerOptions()
 
-				-- Evento: Jogador entrou
+				-- Monitorar jogadores que entram/saem
 				PlayerService.PlayerAdded:Connect(function(player)
 					local playerName = player.Name
+					
+					RefreshPlayerOptions()
 
-					-- Se o jogador estava armazenado (tinha saído), auto-selecionar
 					if LeftPlayers[playerName] then
 						AddToSelected(playerName)
 						LeftPlayers[playerName] = nil
 						UpdateSelectedText()
 					end
 
-					RefreshPlayerList()
-
-					if data.CallBack then
-						data.CallBack(SelectedOrder)
+					-- Re-renderizar lista
+					for _, child in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
+						if child:IsA("Frame") and child.Name ~= "Option" then
+							child:Destroy()
+						end
 					end
+					SetPlayerOptions()
 				end)
 
-				-- Evento: Jogador saiu
 				PlayerService.PlayerRemoving:Connect(function(player)
 					local playerName = player.Name
 
-					-- Se estava selecionado, armazenar como "saiu"
 					if SelectedOptions[playerName] then
 						LeftPlayers[playerName] = true
-						UpdatePlayerColor(playerName, true)
+						for _, opt in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
+							if opt:IsA("Frame") and opt.Name == playerName then
+								tweenservice:Create(opt, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(150, 40, 40)}):Play()
+								tweenservice:Create(opt.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {Color = Color3.fromRGB(200, 80, 80)}):Play()
+								break
+							end
+						end
 					end
 				end)
 
-				-- Função Set para restaurar valores (integração com sistema de config)
-				function data:Set(selectedPlayers)
-					if type(selectedPlayers) ~= "table" then
-						return
-					end
-
-					-- Limpar seleção anterior
-					SelectedOptions = {}
-					SelectedOrder = {}
-
-					-- Restaurar valores
-					for _, playerName in ipairs(selectedPlayers) do
-						if not SelectedOptions[playerName] then
-							SelectedOptions[playerName] = true
-							table.insert(SelectedOrder, playerName)
+				function data:Refresh()
+					RefreshPlayerOptions()
+					for _, child in ipairs(dropdown.dropholder.drop.Container:GetChildren()) do
+						if child:IsA("Frame") and child.Name ~= "Option" then
+							child:Destroy()
 						end
 					end
-
-					UpdateSelectedText()
-
-					-- Trigger callback
-					if self.CallBack then
-						self.CallBack(SelectedOrder)
-					end
+					SetPlayerOptions()
 				end
 
-				-- Registrar no sistema de flags para salvar
 				if data.SFlag then
 					syde.SettingsFlags[data.SFlag] = data
 				end
 
-				-- Carregar valores salvos da configuração
 				if syde.ConfigEnabled and data.Flag and syde.Flags[data.Flag] then
 					local existing = syde.Flags[data.Flag]
 					if type(existing.V) == "table" then
-						data:Set(existing.V)
+						for _, value in ipairs(existing.V) do
+							AddToSelected(value)
+						end
+						UpdateSelectedText()
 					end
-				elseif type(data.V) == "table" and #data.V > 0 then
-					data:Set(data.V)
 				end
 
 				return data
