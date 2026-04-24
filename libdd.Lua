@@ -3,7 +3,7 @@
 .dP"Y8 Yb  dP 8888b.  888888 
 `Ybo."  YbdP   8I  Yb 88__   
 o.`Y8b   8P    8I  dY 88""   
-8bodP'  dP    8888Y"  888888  v1
+8bodP'  dP    8888Y"  888888  v0
 
 ]]
 
@@ -4911,9 +4911,6 @@ function syde:Init(library)
 					PlaceHolder = Dropdown.PlaceHolder or "Select Option...";
 					Multi = Dropdown.Multi or false;
 					CallBack = Dropdown.CallBack;
-					Flag = Dropdown.Flag;
-					SFlag = Dropdown.SFlag;
-					Type = "Dropdown";
 				}
 
 				local dropdown = window.settings.pages.page.Dropdown:Clone()
@@ -5227,85 +5224,6 @@ function syde:Init(library)
 				end
 
 				SetDropdownOptions()
-
-				-- Registrar no sistema de flags para salvar
-				if data.SFlag then
-					syde.SettingsFlags[data.SFlag] = data
-				end
-
-				-- Carregar valores salvos da configuração
-				if syde.ConfigEnabled and data.Flag and syde.Flags[data.Flag] then
-					local existing = syde.Flags[data.Flag]
-					if data.Multi and type(existing.V) == "table" then
-						for _, value in ipairs(existing.V) do
-							AddToSelected(value)
-						end
-						UpdateSelectedText()
-					elseif not data.Multi and existing.V then
-						SelectedOptions = {[existing.V] = true}
-						SelectedOrder = {existing.V}
-						dropdown.dropholder.drop.selected.Text = existing.V
-					end
-				end
-
-				return data
-			end
-
-			function telement:PlayerDropdown(PlayerDropdown)
-				local PlayerService = game:GetService("Players")
-
-				-- Função para gerar opções com jogadores online
-				local function GetPlayerOptions()
-					local options = {}
-					for _, player in ipairs(PlayerService:GetPlayers()) do
-						table.insert(options, player.Name)
-					end
-					return options
-				end
-
-				-- Criar Dropdown nativo com opções de jogadores
-				local dropdownData = self:Dropdown({
-					Title = PlayerDropdown.Title or "Select Players";
-					Options = GetPlayerOptions();
-					PlaceHolder = PlayerDropdown.PlaceHolder or "Select players...";
-					Multi = true;
-					CallBack = PlayerDropdown.CallBack;
-					Flag = PlayerDropdown.Flag;
-					SFlag = PlayerDropdown.SFlag;
-				})
-
-				-- Rastrear jogadores que saíram
-				local leftPlayers = {}
-
-				-- Método Refresh para atualizar lista de jogadores
-				function dropdownData:Refresh()
-					-- Será implementado através do evento de mudança de jogadores
-					-- Este método pode ser chamado manualmente se necessário
-				end
-
-				-- Monitorar quando jogador entra
-				PlayerService.PlayerAdded:Connect(function(player)
-					local playerName = player.Name
-					
-					-- Se jogador estava marcado como offline, auto-selecionar
-					if leftPlayers[playerName] and dropdownData.SelectedOptions then
-						dropdownData.SelectedOptions[playerName] = true
-						table.insert(dropdownData.SelectedOrder, playerName)
-						leftPlayers[playerName] = nil
-					end
-				end)
-
-				-- Monitorar quando jogador sai
-				PlayerService.PlayerRemoving:Connect(function(player)
-					local playerName = player.Name
-					
-					-- Se estava selecionado, marcar como offline (vai ficar vermelho na UI)
-					if dropdownData.SelectedOptions and dropdownData.SelectedOptions[playerName] then
-						leftPlayers[playerName] = true
-					end
-				end)
-
-				return dropdownData
 			end
 
 			function telement:Slider(Slider)
