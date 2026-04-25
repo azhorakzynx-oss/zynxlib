@@ -1,22 +1,418 @@
 --[[
-
-.dP"Y8 Yb  dP 8888b.  888888 
-`Ybo."  YbdP   8I  Yb 88__   
-o.`Y8b   8P    8I  dY 88""   
-8bodP'  dP    8888Y"  888888  v0
-
+████████╗██╗   ██╗███╗   ██╗██╗  ██╗██╗     ██╗██████╗ ██╗      █████╗ ██████╗ ██╗   ██╗
+╚══██╔══╝╚██╗ ██╔╝████╗  ██║╚██╗██╔╝██║     ██║██╔══██╗██║     ██╔══██╗██╔══██╗╚██╗ ██╔╝
+   ██║    ╚████╔╝ ██╔██╗ ██║ ╚███╔╝ ██║     ██║██████╔╝██║     ███████║██████╔╝ ╚████╔╝ 
+   ██║     ╚██╔╝  ██║╚██╗██║ ██╔██╗ ██║     ██║██╔══██╗██║     ██╔══██║██╔══██╗  ╚██╔╝  
+   ██║      ██║   ██║ ╚████║██╔╝ ██╗███████╗██║██████╔╝███████╗██║  ██║██║  ██║   ██║   
+   ╚═╝      ╚═╝   ╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝╚═╝╚═════╝ ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   
+        OrionLib API + 3D Rendering + Advanced Features
 ]]
 
-local inputservice =	game:GetService("InsertService")
-local tweenservice = 	game:GetService("TweenService")
-local https = 			game:GetService("HttpService")
-local runservice =		game:GetService("RunService")
-local userinput =		game:GetService("UserInputService")
-local players =         game:GetService("Players"):GetPlayers()
-local textservice =     game:GetService('TextService')
-local player =          game:GetService('Players')
-local textservice =     game:GetService('TextService')
-local coregui =         game:GetService("CoreGui")
+local players = game:GetService("Players")
+local userinput = game:GetService("UserInputService")
+local tweenservice = game:GetService("TweenService")
+local runservice = game:GetService("RunService")
+local coregui = game:GetService("CoreGui")
+local httpservice = game:GetService("HttpService")
+
+-- ═══════════════════════════════════════════════════════════════
+-- LIBRARY INITIALIZATION
+-- ═══════════════════════════════════════════════════════════════
+
+local ZynxLib = {}
+local Flags = {}
+local SettingsFlags = {}
+local Connections = {}
+local Windows = {}
+
+-- ═══════════════════════════════════════════════════════════════
+-- THEME SYSTEM
+-- ═══════════════════════════════════════════════════════════════
+
+local DefaultTheme = {
+	Accent = Color3.fromRGB(0, 102, 204);
+	HitBox = Color3.fromRGB(0, 102, 204);
+	DropShadow = ColorSequence.new(Color3.fromRGB(0, 0, 0));
+	MainBackground = Color3.fromRGB(20, 20, 20);
+	TabBackground = Color3.fromRGB(25, 25, 25);
+	TextColor = Color3.fromRGB(255, 255, 255);
+}
+
+local CurrentTheme = DefaultTheme
+
+function ZynxLib:UpdateTheme(ThemeConfig)
+	if type(ThemeConfig) ~= "table" then
+		warn("[ZynxLib] Invalid theme config")
+		return
+	end
+	
+	for key, value in pairs(ThemeConfig) do
+		if CurrentTheme[key] then
+			CurrentTheme[key] = value
+		end
+	end
+end
+
+-- ═══════════════════════════════════════════════════════════════
+-- 3D RENDERING SYSTEM (Advanced Hold System)
+-- ═══════════════════════════════════════════════════════════════
+
+local camera = workspace.CurrentCamera
+local binds = {}
+local root = Instance.new('Folder', camera)
+root.Name = 'zynx_3d_root'
+
+local GenUid
+do
+	local id = 0
+	function GenUid()
+		id = id + 1
+		return 'zynx::'..tostring(id)
+	end
+end
+
+-- 3D Drawing Functions (Hold System)
+local function DrawTriangle(v1, v2, v3, p0, p1)
+	local acos, max, pi, sqrt = math.acos, math.max, math.pi, math.sqrt
+	local sz = 0.2
+
+	local s1 = (v1 - v2).magnitude
+	local s2 = (v2 - v3).magnitude
+	local s3 = (v3 - v1).magnitude
+	local smax = max(s1, s2, s3)
+	local A, B, C
+	if s1 == smax then
+		A, B, C = v1, v2, v3
+	elseif s2 == smax then
+		A, B, C = v2, v3, v1
+	elseif s3 == smax then
+		A, B, C = v3, v1, v2
+	end
+
+	local para = ( (B-A).x*(C-A).x + (B-A).y*(C-A).y + (B-A).z*(C-A).z ) / (A-B).magnitude
+	local perp = sqrt((C-A).magnitude^2 - para*para)
+	local dif_para = (A - B).magnitude - para
+
+	local st = CFrame.new(B, A)
+	local za = CFrame.Angles(pi/2,0,0)
+
+	local cf0 = st
+
+	local Top_Look = (cf0 * za).lookVector
+	local Mid_Point = A + CFrame.new(A, B).lookVector * para
+	local Needed_Look = CFrame.new(Mid_Point, C).lookVector
+	local dot = Top_Look.x*Needed_Look.x + Top_Look.y*Needed_Look.y + Top_Look.z*Needed_Look.z
+
+	local ac = CFrame.Angles(0, 0, acos(dot))
+
+	cf0 = cf0 * ac
+	if ((cf0 * za).lookVector - Needed_Look).magnitude > 0.01 then
+		cf0 = cf0 * CFrame.Angles(0, 0, -2*acos(dot))
+	end
+	cf0 = cf0 * CFrame.new(0, perp/2, -(dif_para + para/2))
+
+	local cf1 = st * ac * CFrame.Angles(0, pi, 0)
+	if ((cf1 * za).lookVector - Needed_Look).magnitude > 0.01 then
+		cf1 = cf1 * CFrame.Angles(0, 0, 2*acos(dot))
+	end
+	cf1 = cf1 * CFrame.new(0, perp/2, dif_para/2)
+
+	if not p0 then
+		p0 = Instance.new('Part')
+		p0.FormFactor = 'Custom'
+		p0.TopSurface = 0
+		p0.BottomSurface = 0
+		p0.Anchored = true
+		p0.CanCollide = false
+		p0.Material = 'Glass'
+		p0.Size = Vector3.new(sz, sz, sz)
+		local mesh = Instance.new('SpecialMesh', p0)
+		mesh.MeshType = 2
+		mesh.Name = 'WedgeMesh'
+	end
+	p0.WedgeMesh.Scale = Vector3.new(0, perp/sz, para/sz)
+	p0.CFrame = cf0
+
+	if not p1 then
+		p1 = p0:clone()
+	end
+	p1.WedgeMesh.Scale = Vector3.new(0, perp/sz, dif_para/sz)
+	p1.CFrame = cf1
+
+	return p0, p1
+end
+
+local function DrawQuad(v1, v2, v3, v4, parts)
+	parts[1], parts[2] = DrawTriangle(v1, v2, v3, parts[1], parts[2])
+	parts[3], parts[4] = DrawTriangle(v3, v2, v4, parts[3], parts[4])
+end
+
+-- ═══════════════════════════════════════════════════════════════
+-- UI CREATION FUNCTIONS (OrionLib Compatible)
+-- ═══════════════════════════════════════════════════════════════
+
+function ZynxLib:MakeWindow(Config)
+	Config = Config or {}
+	
+	local Window = {}
+	Window.Name = Config.Name or "Zynx Hub"
+	Window.Tabs = {}
+	Window.MainGui = Instance.new("ScreenGui")
+	Window.MainGui.Name = Window.Name
+	Window.MainGui.ResetOnSpawn = false
+	
+	local gethui = function()
+		return game.CoreGui
+	end
+	
+	local success, result = pcall(gethui)
+	Window.MainGui.Parent = success and result or coregui
+	
+	table.insert(Windows, Window)
+	
+	function Window:MakeTab(TabConfig)
+		TabConfig = TabConfig or {}
+		
+		local Tab = {}
+		Tab.Name = TabConfig.Name or "Tab"
+		Tab.Parent = self
+		Tab.Elements = {}
+		Tab.Frame = Instance.new("Frame")
+		Tab.Frame.Name = Tab.Name
+		Tab.Frame.BackgroundColor3 = CurrentTheme.TabBackground
+		Tab.Frame.Size = UDim2.new(1, 0, 1, 0)
+		Tab.Frame.Parent = Window.MainGui
+		
+		-- Add Tab Methods
+		function Tab:AddToggle(ToggleConfig)
+			ToggleConfig = ToggleConfig or {}
+			
+			local ToggleName = ToggleConfig.Name or "Toggle"
+			local Default = ToggleConfig.Default or false
+			local Flag = ToggleConfig.Flag or ToggleName
+			local Callback = ToggleConfig.Callback or function() end
+			
+			Flags[Flag] = Default
+			
+			-- Create Toggle UI Element
+			local ToggleContainer = Instance.new("Frame")
+			ToggleContainer.Name = ToggleName
+			ToggleContainer.BackgroundColor3 = CurrentTheme.MainBackground
+			ToggleContainer.Size = UDim2.new(0.9, 0, 0, 30)
+			ToggleContainer.Parent = Tab.Frame
+			
+			local ToggleButton = Instance.new("TextButton")
+			ToggleButton.Name = "Button"
+			ToggleButton.BackgroundColor3 = Default and CurrentTheme.Accent or Color3.fromRGB(50, 50, 50)
+			ToggleButton.Size = UDim2.new(0, 30, 0, 30)
+			ToggleButton.Parent = ToggleContainer
+			ToggleButton.Text = ""
+			
+			local ToggleLabel = Instance.new("TextLabel")
+			ToggleLabel.Name = "Label"
+			ToggleLabel.BackgroundTransparency = 1
+			ToggleLabel.TextColor3 = CurrentTheme.TextColor
+			ToggleLabel.Size = UDim2.new(0.8, 0, 1, 0)
+			ToggleLabel.Position = UDim2.new(0.15, 0, 0, 0)
+			ToggleLabel.Text = ToggleName
+			ToggleLabel.Parent = ToggleContainer
+			
+			local ToggleState = Default
+			
+			ToggleButton.MouseButton1Click:Connect(function()
+				ToggleState = not ToggleState
+				Flags[Flag] = ToggleState
+				ToggleButton.BackgroundColor3 = ToggleState and CurrentTheme.Accent or Color3.fromRGB(50, 50, 50)
+				Callback(ToggleState)
+			end)
+			
+			table.insert(Tab.Elements, ToggleContainer)
+			return ToggleContainer
+		end
+		
+		function Tab:AddSlider(SliderConfig)
+			SliderConfig = SliderConfig or {}
+			
+			local SliderName = SliderConfig.Name or "Slider"
+			local Min = SliderConfig.Min or 0
+			local Max = SliderConfig.Max or 100
+			local Default = SliderConfig.Default or Min
+			local Flag = SliderConfig.Flag or SliderName
+			local Callback = SliderConfig.Callback or function() end
+			
+			Flags[Flag] = Default
+			
+			-- Create Slider UI
+			local SliderContainer = Instance.new("Frame")
+			SliderContainer.Name = SliderName
+			SliderContainer.BackgroundColor3 = CurrentTheme.MainBackground
+			SliderContainer.Size = UDim2.new(0.9, 0, 0, 50)
+			SliderContainer.Parent = Tab.Frame
+			
+			local SliderLabel = Instance.new("TextLabel")
+			SliderLabel.Name = "Label"
+			SliderLabel.BackgroundTransparency = 1
+			SliderLabel.TextColor3 = CurrentTheme.TextColor
+			SliderLabel.Size = UDim2.new(1, 0, 0, 20)
+			SliderLabel.Text = SliderName .. ": " .. Default
+			SliderLabel.Parent = SliderContainer
+			
+			local SliderBar = Instance.new("Frame")
+			SliderBar.Name = "Bar"
+			SliderBar.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+			SliderBar.Size = UDim2.new(1, 0, 0, 10)
+			SliderBar.Position = UDim2.new(0, 0, 0, 25)
+			SliderBar.Parent = SliderContainer
+			
+			local SliderFill = Instance.new("Frame")
+			SliderFill.Name = "Fill"
+			SliderFill.BackgroundColor3 = CurrentTheme.Accent
+			SliderFill.Size = UDim2.new((Default - Min) / (Max - Min), 0, 1, 0)
+			SliderFill.Parent = SliderBar
+			
+			local SliderDragging = false
+			
+			SliderBar.InputBegan:Connect(function(input, gameProcessed)
+				if gameProcessed then return end
+				if input.UserInputType == Enum.UserInputType.MouseButton1 then
+					SliderDragging = true
+				end
+			end)
+			
+			SliderBar.InputEnded:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 then
+					SliderDragging = false
+				end
+			end)
+			
+			userinput.InputChanged:Connect(function(input)
+				if SliderDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+					local Mouse = players.LocalPlayer:GetMouse()
+					local LocalX = Mouse.X - SliderBar.AbsolutePosition.X
+					local Percentage = math.clamp(LocalX / SliderBar.AbsoluteSize.X, 0, 1)
+					local Value = Min + (Percentage * (Max - Min))
+					
+					Flags[Flag] = Value
+					SliderFill.Size = UDim2.new(Percentage, 0, 1, 0)
+					SliderLabel.Text = SliderName .. ": " .. math.floor(Value)
+					Callback(Value)
+				end
+			end)
+			
+			table.insert(Tab.Elements, SliderContainer)
+			return SliderContainer
+		end
+		
+		function Tab:AddButton(ButtonConfig)
+			ButtonConfig = ButtonConfig or {}
+			
+			local ButtonName = ButtonConfig.Name or "Button"
+			local Callback = ButtonConfig.Callback or function() end
+			
+			local ButtonContainer = Instance.new("TextButton")
+			ButtonContainer.Name = ButtonName
+			ButtonContainer.BackgroundColor3 = CurrentTheme.Accent
+			ButtonContainer.TextColor3 = CurrentTheme.TextColor
+			ButtonContainer.Size = UDim2.new(0.9, 0, 0, 35)
+			ButtonContainer.Text = ButtonName
+			ButtonContainer.Parent = Tab.Frame
+			
+			ButtonContainer.MouseButton1Click:Connect(function()
+				Callback()
+			end)
+			
+			table.insert(Tab.Elements, ButtonContainer)
+			return ButtonContainer
+		end
+		
+		function Tab:AddLabel(LabelText)
+			local LabelContainer = Instance.new("TextLabel")
+			LabelContainer.Name = "Label"
+			LabelContainer.BackgroundColor3 = CurrentTheme.MainBackground
+			LabelContainer.TextColor3 = CurrentTheme.TextColor
+			LabelContainer.Size = UDim2.new(0.9, 0, 0, 30)
+			LabelContainer.Text = LabelText
+			LabelContainer.Parent = Tab.Frame
+			
+			table.insert(Tab.Elements, LabelContainer)
+			return LabelContainer
+		end
+		
+		table.insert(self.Tabs, Tab)
+		return Tab
+	end
+	
+	return Window
+end
+
+-- ═══════════════════════════════════════════════════════════════
+-- NOTIFICATION SYSTEM
+-- ═══════════════════════════════════════════════════════════════
+
+function ZynxLib:Notify(NotifyConfig)
+	NotifyConfig = NotifyConfig or {}
+	
+	local Title = NotifyConfig.Title or "Notification"
+	local Content = NotifyConfig.Content or ""
+	local Duration = NotifyConfig.Duration or 3
+	
+	local NotifyGui = Instance.new("ScreenGui")
+	NotifyGui.Name = "Notification"
+	NotifyGui.ResetOnSpawn = false
+	NotifyGui.Parent = coregui
+	
+	local NotifyFrame = Instance.new("Frame")
+	NotifyFrame.Name = "NotifyFrame"
+	NotifyFrame.BackgroundColor3 = CurrentTheme.MainBackground
+	NotifyFrame.Size = UDim2.new(0, 300, 0, 100)
+	NotifyFrame.Position = UDim2.new(1, -320, 1, -120)
+	NotifyFrame.Parent = NotifyGui
+	
+	local TitleLabel = Instance.new("TextLabel")
+	TitleLabel.BackgroundTransparency = 1
+	TitleLabel.TextColor3 = CurrentTheme.Accent
+	TitleLabel.Size = UDim2.new(1, 0, 0, 30)
+	TitleLabel.Text = Title
+	TitleLabel.Parent = NotifyFrame
+	
+	local ContentLabel = Instance.new("TextLabel")
+	ContentLabel.BackgroundTransparency = 1
+	ContentLabel.TextColor3 = CurrentTheme.TextColor
+	ContentLabel.Size = UDim2.new(1, 0, 0.7, 0)
+	ContentLabel.Position = UDim2.new(0, 0, 0, 30)
+	ContentLabel.Text = Content
+	ContentLabel.Parent = NotifyFrame
+	
+	task.wait(Duration)
+	
+	tweenservice:Create(NotifyFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Position = UDim2.new(1, 0, 1, 0)}):Play()
+	task.wait(0.5)
+	NotifyGui:Destroy()
+end
+
+-- ═══════════════════════════════════════════════════════════════
+-- CLEANUP & UTILITY FUNCTIONS
+-- ═══════════════════════════════════════════════════════════════
+
+function ZynxLib:Init()
+	-- Initialize library
+	return self
+end
+
+function ZynxLib:Destroy()
+	for _, window in pairs(Windows) do
+		window.MainGui:Destroy()
+	end
+	Windows = {}
+	Flags = {}
+	SettingsFlags = {}
+end
+
+-- ═══════════════════════════════════════════════════════════════
+-- EXPORT
+-- ═══════════════════════════════════════════════════════════════
+
+return ZynxLib
 
 -- update check
 local update = false
