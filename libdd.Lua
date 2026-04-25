@@ -1774,7 +1774,7 @@ local intro = false
 local bluron = false
 local glow = false
 
-local uitoggle = Enum.KeyCode.RightShift
+local uitoggle = Enum.KeyCode.M
 --
 
 function applyLayout(isMobile)
